@@ -175,6 +175,17 @@ func (b *bmpClient) loop() {
 				return false
 			}
 
+			if b.c.RouteMonitoringPolicy == oc.BMP_ROUTE_MONITORING_POLICY_TYPE_LOCAL_RIB || b.c.RouteMonitoringPolicy == oc.BMP_ROUTE_MONITORING_POLICY_TYPE_ALL {
+				info := &table.PeerInfo{
+					Address: netip.MustParseAddr("0.0.0.0"),
+					AS:      b.s.bgpConfig.Global.Config.As,
+					ID:      b.s.bgpConfig.Global.Config.RouterId,
+				}
+				if err := write(bmpLocalRibPeerUp(info)); err != nil {
+					return false
+				}
+			}
+
 			for {
 				select {
 				case ev := <-w.Event():
@@ -289,6 +300,12 @@ func bmpPeerUp(ev *watchEventPeer, t uint8, policy bool, pd uint64) *bmp.BMPMess
 	// TODO: use netip event strcutres. MustParseAddr is safe because they are valid IP addresses.
 	ph := bmp.NewBMPPeerHeader(t, flags, pd, netip.MustParseAddr(ev.PeerAddress.String()), ev.PeerAS, netip.MustParseAddr(ev.PeerID.String()), float64(ev.Timestamp.Unix()))
 	return bmp.NewBMPPeerUpNotification(*ph, netip.MustParseAddr(ev.LocalAddress.String()), ev.LocalPort, ev.PeerPort, ev.SentOpen, ev.RecvOpen)
+}
+
+func bmpLocalRibPeerUp(peeri *table.PeerInfo) *bmp.BMPMessage {
+	ph := bmp.NewBMPPeerHeader(bmp.BMP_PEER_TYPE_LOCAL_RIB, 0, 0, peeri.LocalAddress, peeri.AS, peeri.ID, float64(time.Now().Unix()))
+	open, _ := bgp.NewBGPOpenMessage(uint16(peeri.AS), 0, peeri.ID, nil)
+	return bmp.NewBMPPeerUpNotification(*ph, peeri.LocalAddress, 0, 0, open, open)
 }
 
 func bmpPeerDown(ev *watchEventPeer, t uint8, policy bool, pd uint64) *bmp.BMPMessage {
