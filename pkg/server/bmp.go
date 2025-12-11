@@ -304,7 +304,15 @@ func bmpPeerUp(ev *watchEventPeer, t uint8, policy bool, pd uint64) *bmp.BMPMess
 
 func bmpLocalRibPeerUp(peeri *table.PeerInfo) *bmp.BMPMessage {
 	ph := bmp.NewBMPPeerHeader(bmp.BMP_PEER_TYPE_LOCAL_RIB, 0, 0, peeri.LocalAddress, peeri.AS, peeri.ID, float64(time.Now().Unix()))
-	open, _ := bgp.NewBGPOpenMessage(uint16(peeri.AS), 0, peeri.ID, nil)
+	optparams := []bgp.OptionParameterInterface{
+		bgp.NewOptionParameterCapability([]bgp.ParameterCapabilityInterface{
+			bgp.NewCapAddPath([]*bgp.CapAddPathTuple{
+				{Family: bgp.RF_IPv4_UC, Mode: bgp.BGP_ADD_PATH_BOTH},
+				{Family: bgp.RF_IPv6_UC, Mode: bgp.BGP_ADD_PATH_BOTH},
+			}),
+		}),
+	}
+	open, _ := bgp.NewBGPOpenMessage(uint16(peeri.AS), 0, peeri.ID, optparams)
 	return bmp.NewBMPPeerUpNotification(*ph, peeri.LocalAddress, 0, 0, open, open)
 }
 
