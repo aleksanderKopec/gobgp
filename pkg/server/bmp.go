@@ -208,8 +208,11 @@ func (b *bmpClient) loop() {
 								}
 							}
 							for _, path := range pathList {
-								for _, u := range table.CreateUpdateMsgFromPaths([]*table.Path{path}) {
-									payload, _ := u.Serialize()
+								opt := &bgp.MarshallingOption{
+									AddPath: map[bgp.Family]bgp.BGPAddPathMode{bgp.RF_IPv4_UC: bgp.BGP_ADD_PATH_BOTH, bgp.RF_IPv6_UC: bgp.BGP_ADD_PATH_BOTH},
+								}
+								for _, u := range table.CreateUpdateMsgFromPaths([]*table.Path{path}, opt) {
+									payload, _ := u.Serialize(opt)
 									if err := write(bmpPeerRoute(bmp.BMP_PEER_TYPE_GLOBAL, msg.PostPolicy, 0, true, info, path.GetTimestamp().Unix(), payload)); err != nil {
 										return false
 									}
@@ -224,9 +227,12 @@ func (b *bmpClient) loop() {
 							AS:      b.s.bgpConfig.Global.Config.As,
 							ID:      b.s.bgpConfig.Global.Config.RouterId,
 						}
+						opt := &bgp.MarshallingOption{
+							AddPath: map[bgp.Family]bgp.BGPAddPathMode{bgp.RF_IPv4_UC: bgp.BGP_ADD_PATH_BOTH},
+						}
 						for _, p := range msg.PathList {
-							u := table.CreateUpdateMsgFromPaths([]*table.Path{p})[0]
-							if payload, err := u.Serialize(); err != nil {
+							u := table.CreateUpdateMsgFromPaths([]*table.Path{p}, opt)[0]
+							if payload, err := u.Serialize(opt); err != nil {
 								return false
 							} else if err = write(bmpPeerRoute(bmp.BMP_PEER_TYPE_LOCAL_RIB, false, 0, true, info, p.GetTimestamp().Unix(), payload)); err != nil {
 								return false
