@@ -314,7 +314,11 @@ func createMPReachMessage(path *Path) *bgp.BGPMessage {
 	attrs := make([]bgp.PathAttributeInterface, 0, len(oattrs))
 	for _, a := range oattrs {
 		if a.GetType() == bgp.BGP_ATTR_TYPE_MP_REACH_NLRI {
-			attr, _ := bgp.NewPathAttributeMpReachNLRI(path.GetFamily(), []bgp.PathNLRI{{NLRI: path.GetNlri(), ID: path.localID}}, path.GetNexthop())
+			id := path.localID
+			if id == 0 {
+				id = path.remoteID
+			}
+			attr, _ := bgp.NewPathAttributeMpReachNLRI(path.GetFamily(), []bgp.PathNLRI{{NLRI: path.GetNlri(), ID: id}}, path.GetNexthop())
 			attrs = append(attrs, attr)
 		} else {
 			attrs = append(attrs, a)
@@ -328,7 +332,11 @@ func (p *packerMP) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 
 	for _, path := range p.withdrawals {
 		nlri := path.GetNlri()
-		unreach, _ := bgp.NewPathAttributeMpUnreachNLRI(path.GetFamily(), []bgp.PathNLRI{{NLRI: nlri, ID: path.localID}})
+		id := path.localID
+		if id == 0 {
+			id = path.remoteID
+		}
+		unreach, _ := bgp.NewPathAttributeMpUnreachNLRI(path.GetFamily(), []bgp.PathNLRI{{NLRI: nlri, ID: id}})
 		msgs = append(msgs, bgp.NewBGPUpdateMessage(nil, []bgp.PathAttributeInterface{unreach}, nil))
 	}
 
@@ -410,7 +418,11 @@ func (p *packerV4) pack(options ...*bgp.MarshallingOption) []*bgp.BGPMessage {
 		nlris := make([]bgp.PathNLRI, 0, max)
 		i := 0
 		for ; i < max; i++ {
-			nlris = append(nlris, bgp.PathNLRI{NLRI: paths[i].GetNlri().(*bgp.IPAddrPrefix), ID: paths[i].localID})
+			id := paths[i].localID //generated Local ID in case of Loc-RIB
+			if id == 0 {
+				id = paths[i].remoteID //received Remote ID in case of post policy Adj-RIB-In
+			}
+			nlris = append(nlris, bgp.PathNLRI{NLRI: paths[i].GetNlri().(*bgp.IPAddrPrefix), ID: id})
 		}
 		return nlris, paths[i:]
 	}
